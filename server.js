@@ -25,7 +25,8 @@ app.use(cors());
 app.get('/location', getLocation);
 app.get('/weather', getWeather);
 app.get('/yelp', getYelp);
-app.get('/movies', getMov);
+app.get('/movies', getMovie);
+app.get('/meetups', getMeetUps);
 
 //========================LOOK FOR RESULTS IN DATABASE==============================================//
 
@@ -110,12 +111,68 @@ function getYelp (request, response){
     );
 }
 
-function getMov (request, response) {
-  return searchMovs(request.query.data)
-    .then(movData => {
-      response.send(movData);}
-    );
+function getMovie (request, response) {
+    console.log('1 fish 2 fish');
+    const movieHandler = {
+      tableName: Movie.tableName,
+  
+      location: request.query.data.id,
+  
+      cacheHit: function (result) {
+        response.send(result.rows);
+      },
+  
+      cacheMiss: function () {
+        console.log('red fish blue fish');
+        const url = `https://api.themoviedb.org/3/movie/76341?api_key=${MOVIES_API_KEY}`;
+        console.log(url);
+        superagent.get(url)
+          .then(result => {
+            const movieData = result.body.daily.data.map(movie => {
+              const movies = new Movie(movie);
+              movies.save(request.query.data.id);
+              return movies;
+            });
+            response.send(movieData);
+          })
+          .catch(error => handleError(error, response));
+      }
+    };
+    
+    Movie.lookup(movieHandler);
+  }
+
+function getMeetUps(request, response) {
+
+  console.log('are we here yet?');
+  const meetupHandler = {
+    tableName: Meetup.tableName,
+
+    location: request.query.data.id,
+
+    cacheHit: function (result) {
+      response.send(result.rows);
+    },
+
+    cacheMiss: function () {
+      const url = ``;
+      console.log(url);
+      superagent.get(url)
+        .then(result => {
+          const meetUpInfo = result.body.daily.data.map(meet => {
+            const meetInfo = new Meetup(meet);
+            meetInfo.save(request.query.data.id);
+            return meetInfo;
+          });
+          response.send(meetUpInfo);
+        })
+        .catch(error => handleError(error, response));
+    }
+  };
+  
+  Meetup.lookup(meetupHandler);
 }
+
 
 //Constructor Function
 function Location(query, res){
@@ -151,6 +208,13 @@ function Movie(movie) {
   this.image_url = `http://image.tmdb.org/t/p/w200_and_h300_bestv2${movie.poster_path}`;
   this.popularity = movie.popularity;
   this.released_on = movie.release_date;
+}
+
+function Meetup(meetups) {
+  this.link = meetups.link;
+  this.name = meetups.name;
+  this.creation_date = meetups.creation_date;
+  this.host = meetups.host;
 }
 
 //SQL
